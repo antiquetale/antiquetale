@@ -550,18 +550,34 @@ function build(){
 function pick(){
   var mat = document.getElementById('f3').value.trim(),
       cty = document.getElementById('f5').value.trim(),
-      best = DATA.items[0], top = -1;
-  (DATA.items || []).forEach(function(it){
+      items = DATA.items || [], best = null, top = -1;
+  items.forEach(function(it){
     var m = it.match || {}, s = 0;
     if (cty && m.country === cty) s += 3;
     if (mat && m.material === mat) s += 2;
-    if (mat && m.material && m.material.split(' ')[0] === mat.split(' ')[0]) s += 1;
     if (s > top) { top = s; best = it; }
   });
-  return best;
+  if (best) return best;
+
+  var f = ['f1','f2','f3','f4','f5'].map(function(id){ return document.getElementById(id).value.trim(); });
+  var list = [];
+  if (f[2]) list.push('Материал: ' + f[2]);
+  if (f[1]) list.push('Размеры: ' + f[1]);
+  if (f[0]) list.push('Клеймо: ' + f[0]);
+  if (f[3]) list.push('Износ: ' + f[3]);
+  if (f[4]) list.push('Страна покупки: ' + f[4]);
+  return {
+    title: 'Новый предмет',
+    text: 'Разбор появится, когда будет подключена модель. Пока сохранены данные, внесённые вручную.',
+    analysis: {
+      findings: list.length ? list : ['Данные не заполнены'],
+      epoch: 'Разбор не подключён',
+      symbolism: 'Символика появится после подключения модели.',
+      checkLive: ['Клеймо на дне или обороте', 'Вес и характер материала', 'Где стёрто и есть ли следы ремонта']
+    }
+  };
 }
 
-/* ── Результат ── */
 function openItem(it, photo){
   current = it;
   var a = it.analysis || {};
