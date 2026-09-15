@@ -111,6 +111,9 @@ select.i{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3
 .shot img{width:100%;height:100%;object-fit:contain}
 .block{background:var(--bg-soft);border:1px solid var(--line);border-radius:15px;padding:15px;margin-top:14px}
 .block .cap{font-size:10px;letter-spacing:2.5px;color:var(--brass);margin-bottom:11px}
+ul.facts{margin:0;padding-left:16px;font-family:var(--serif);font-size:15px;line-height:1.55;color:var(--bone)}
+ul.facts li{margin-bottom:5px}
+ul.facts li::marker{color:var(--brass)}
 .block .body{font-family:var(--serif);font-size:15.5px;line-height:1.62;color:var(--bone);white-space:pre-wrap}
 .copy{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;margin-top:13px;
   background:transparent;border:1px solid var(--brass-dim);color:var(--brass);border-radius:12px;
@@ -126,12 +129,6 @@ select.i{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3
 .pair{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:13.5px}
 .pair dt{flex:0 0 96px;color:var(--sage);font-size:11px;letter-spacing:1.5px;padding-top:3px}
 .pair dd{margin:0;font-family:var(--serif);font-size:15px;color:var(--bone);line-height:1.45}
-.vh{font-size:10px;letter-spacing:2.5px;color:var(--brass);margin:16px 0 10px}
-.ver{margin-bottom:11px}
-.ver .t{display:flex;justify-content:space-between;font-family:var(--serif);font-size:14.5px;margin-bottom:5px}
-.ver .t em{font-style:normal;font-family:var(--ui);font-size:11.5px;color:var(--sage)}
-.ver .track{height:3px;background:var(--line);border-radius:2px;overflow:hidden}
-.ver .fill{height:100%;background:var(--brass)}
 ul.check{margin:0;padding-left:17px;font-family:var(--serif);font-size:14.5px;line-height:1.62;color:var(--bone)}
 ul.check li{margin-bottom:5px}
 ul.check li::marker{color:var(--brass)}
@@ -202,33 +199,34 @@ ul.check li::marker{color:var(--brass)}
 </div>
 
 <div id="result" class="screen">
-  <div class="bar"><button id="backResult">‹</button><h1>Готовый текст</h1></div>
+  <div class="bar"><button id="backResult">‹</button><h1>Разбор предмета</h1></div>
   <div class="wrap">
     <div class="shot" id="rShot"></div>
     <div class="hd" id="rTitle"></div>
     <div class="sub" id="rSub"></div>
 
     <div class="block">
-      <div class="cap">ТЕКСТ ДЛЯ TELEGRAM И INSTAGRAM</div>
-      <div class="body" id="rText"></div>
-      <button class="copy" id="btnCopy">Скопировать текст</button>
+      <div class="cap">РАЗБОР ПРЕДМЕТА</div>
+      <ul class="facts" id="aFacts"></ul>
     </div>
 
-    <button class="fold" id="foldBtn"><span>Разбор предмета</span><span id="foldIco">+</span></button>
-    <div class="folded" id="foldBox">
-      <dl style="margin:0">
-        <div class="pair"><dt>ЭПОХА</dt><dd id="aEpoch"></dd></div>
-        <div class="pair"><dt>СТИЛЬ</dt><dd id="aStyle"></dd></div>
-        <div class="pair"><dt>ПРОИСХОЖД.</dt><dd id="aOrigin"></dd></div>
-        <div class="pair" style="border:0"><dt>СИМВОЛИКА</dt><dd id="aSymbol"></dd></div>
-      </dl>
-      <div class="vh">ВЕРСИИ АТРИБУЦИИ</div>
-      <div id="aVers"></div>
-      <div class="vh">ПРОВЕРИТЬ ВЖИВУЮ</div>
+    <div class="block">
+      <div class="cap">СИМВОЛИКА И КОНТЕКСТ</div>
+      <div class="body" id="aSymbol" style="font-size:15px"></div>
+    </div>
+
+    <div class="block">
+      <div class="cap">ПРОВЕРИТЬ ВЖИВУЮ</div>
       <ul class="check" id="aCheck"></ul>
     </div>
 
-    <p class="note">Атрибуция по фотографии не устанавливает подлинность.<br>Версии даны с оценкой уверенности — решение за экспертом.</p>
+    <button class="fold" id="foldBtn"><span>Готовый текст для публикации</span><span id="foldIco">+</span></button>
+    <div class="folded" id="foldBox">
+      <div class="body" id="rText" style="padding-top:13px"></div>
+      <button class="copy" id="btnCopy">Скопировать текст</button>
+    </div>
+
+    <p class="note">Разбор по фотографии не подтверждает подлинность.<br>Окончательное решение — за экспертом с предметом в руках.</p>
   </div>
 </div>
 
@@ -437,6 +435,7 @@ function normalize(r){
     title: String(r.title || 'Предмет без названия'),
     text: String(r.text || ''),
     analysis: {
+      findings: (a.findings || []).slice(0, 10).map(String),
       epoch: a.epoch || '—', style: a.style || '—',
       origin: a.origin || '—', symbolism: a.symbolism || '—',
       versions: vs.length ? vs : [{ label: 'Версий не предложено', confidence: 0 }],
@@ -491,28 +490,30 @@ function pick(){
 /* ── Результат ── */
 function openItem(it, photo){
   current = it;
+  var a = it.analysis || {};
   var shot = document.getElementById('rShot');
   var own = it.useRose ? ROSE : (it.usePhoto ? SHOTS[it.usePhoto] : null);
   if (photo) shot.innerHTML = '<img src="'+photo+'" style="object-fit:cover" alt="">';
   else if (own) shot.innerHTML = '<img src="'+own+'" style="object-fit:cover" alt="">';
-  else shot.innerHTML = '<span style="font-family:var(--display);font-size:34px;color:var(--brass-dim)">'+(it.monogram||'◆')+'</span>';
+  else shot.innerHTML = '<span style="font-family:var(--display);font-size:34px;color:var(--brass-dim)">'+(it.monogram||'\u25c6')+'</span>';
 
   document.getElementById('rTitle').textContent = it.title;
-  document.getElementById('rSub').textContent = (it.analysis.epoch || '').toUpperCase();
-  document.getElementById('rText').textContent = it.text;
+  document.getElementById('rSub').textContent = String(a.epoch || '').toUpperCase();
 
-  var a = it.analysis;
-  document.getElementById('aEpoch').textContent  = a.epoch || '—';
-  document.getElementById('aStyle').textContent  = a.style || '—';
-  document.getElementById('aOrigin').textContent = a.origin || '—';
-  document.getElementById('aSymbol').textContent = a.symbolism || '—';
+  var list = a.findings && a.findings.length
+             ? a.findings
+             : (a.established || []).concat(a.assumed || []);
+  if (!list.length) {
+    list = [];
+    if (a.epoch)  list.push('Эпоха: ' + a.epoch);
+    if (a.style)  list.push('Стиль: ' + a.style);
+    if (a.origin) list.push('Происхождение: ' + a.origin);
+  }
+  document.getElementById('aFacts').innerHTML =
+    list.slice(0, 10).map(function(x){ return '<li>' + String(x) + '</li>'; }).join('');
 
-  var vh = '';
-  (a.versions || []).forEach(function(v){
-    vh += '<div class="ver"><div class="t"><span>'+v.label+'</span><em>'+v.confidence+'%</em></div>' +
-          '<div class="track"><div class="fill" style="width:'+v.confidence+'%"></div></div></div>';
-  });
-  document.getElementById('aVers').innerHTML = vh;
+  document.getElementById('aSymbol').textContent = a.symbolism || '\u2014';
+  document.getElementById('rText').textContent = it.text || '';
 
   var ch = '';
   (a.checkLive || []).forEach(function(c){ ch += '<li>'+c+'</li>'; });
