@@ -191,7 +191,7 @@ ul.check li::marker{color:var(--brass)}
     <div class="meter">
       <div class="row"><span>Полнота данных</span><b id="mPct">0%</b></div>
       <div class="track"><div class="fill" id="mFill"></div></div>
-      <p id="mHint">Без клейма и размеров разбор будет слабее — версий больше, уверенности меньше.</p>
+      <p id="mHint">Больше всего дают фотография и клеймо — начни с них.</p>
     </div>
 
     <button class="act" id="btnBuild">Собрать текст</button>
@@ -359,9 +359,9 @@ function meter(){
   if (!document.getElementById('f4').value.trim()) miss.push('износ');
   if (!document.getElementById('f5').value.trim()) miss.push('страну покупки');
   var h = document.getElementById('mHint');
-  if (!miss.length) h.textContent = 'Данных достаточно. Разбор будет настолько точным, насколько это вообще возможно по фотографии.';
-  else if (miss.length === 1) h.textContent = 'Осталось добавить ' + miss[0] + '.';
-  else h.textContent = 'Не хватает: ' + miss.join(', ') + '. Клеймо и размеры дают больше всего.';
+  if (!miss.length) h.textContent = 'Данных достаточно. Разбор будет настолько точным, насколько это возможно по фотографии.';
+  else if (miss.length > 3) h.textContent = 'Больше всего дают фотография и клеймо — начни с них.';
+  else h.textContent = 'Осталось добавить: ' + miss.join(', ') + '.';
 }
 
 function reset(){
