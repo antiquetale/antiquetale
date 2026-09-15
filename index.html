@@ -133,6 +133,7 @@ ul.check{margin:0;padding-left:17px;font-family:var(--serif);font-size:14.5px;li
 ul.check li{margin-bottom:5px}
 ul.check li::marker{color:var(--brass)}
 .note{font-size:11px;color:var(--sage);opacity:.7;line-height:1.5;margin:20px 2px 0;text-align:center}
+.hint{font-size:11px;color:var(--sage);opacity:.55;text-align:center;margin:16px 0 0}
 
 /* ── Пустой экран и ошибка ── */
 .empty{text-align:center;padding:34px 20px}
@@ -162,6 +163,7 @@ ul.check li::marker{color:var(--brass)}
     <button class="act" id="btnNew">Новый предмет</button>
     <div class="stat"><span id="statTotal">—</span><em id="statReady"></em></div>
     <div id="list"></div>
+    <p class="hint" id="hint">Удерживай карточку, чтобы удалить</p>
   </div>
 </div>
 
@@ -226,6 +228,8 @@ ul.check li::marker{color:var(--brass)}
       <button class="copy" id="btnCopy">Скопировать текст</button>
     </div>
 
+    <button class="copy" id="btnDel" style="border-color:#6E3038;color:#C08A93;margin-top:14px">Удалить предмет</button>
+
     <p class="note">Разбор по фотографии не подтверждает подлинность.<br>Окончательное решение — за экспертом с предметом в руках.</p>
   </div>
 </div>
@@ -255,6 +259,53 @@ document.getElementById('portrait').src = PHOTO;
 document.getElementById('roseVeil').src = ROSE;
 
 var DATA = null, current = null, shotData = null;
+
+var VIEW = [];
+var STORE = 'antik.items', HIDE = 'antik.hidden';
+var MONTHS = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+
+function readLS(k){ try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch(e){ return []; } }
+function writeLS(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } }
+
+function ask(text, cb){
+  if (TG && TG.showConfirm) { try { TG.showConfirm(text, function(ok){ cb(!!ok); }); return; } catch(e){} }
+  cb(window.confirm(text));
+}
+
+function longPress(el, fn){
+  var t = null, moved = false;
+  function go(){ t = setTimeout(function(){ if (!moved) { el._lp = true; tap('heavy'); fn(); } }, 550); }
+  function stop(){ clearTimeout(t); }
+  el.addEventListener('touchstart', function(){ moved = false; go(); }, {passive:true});
+  el.addEventListener('touchmove',  function(){ moved = true; stop(); }, {passive:true});
+  el.addEventListener('touchend',   stop, {passive:true});
+  el.addEventListener('mousedown',  function(){ moved = false; go(); });
+  el.addEventListener('mouseup',    stop);
+  el.addEventListener('mouseleave', stop);
+}
+
+function removeCard(it){
+  var what = it.saved ? 'Удалить «' + it.title + '»? Это навсегда.'
+                      : 'Убрать пример «' + it.title + '» из списка?';
+  ask(what, function(ok){
+    if (!ok) return;
+    if (it.saved) writeLS(STORE, readLS(STORE).filter(function(x){ return x.id !== it.id; }));
+    else { var hid = readLS(HIDE); if (hid.indexOf(it.id) < 0) hid.push(it.id); writeLS(HIDE, hid); }
+    render(); toast(it.saved ? 'Удалено' : 'Пример убран');
+  });
+}
+
+function persist(item, thumb){
+  var all = readLS(STORE);
+  var d = new Date();
+  all.unshift({
+    id: 's' + Date.now(), saved: true, thumb: thumb || null,
+    title: item.title, statusLabel: d.getDate() + ' ' + MONTHS[d.getMonth()],
+    analysis: item.analysis, text: item.text
+  });
+  if (all.length > 200) all = all.slice(0, 200);
+  if (!writeLS(STORE, all)) toast('Память переполнена');
+}
 
 function show(id){
   var s = document.querySelectorAll('.screen');
@@ -293,24 +344,36 @@ function render(){
   fillSelect('f3', DATA.materials);
   fillSelect('f5', DATA.countries);
 
-  var items = DATA.items || [], ready = 0, list = document.getElementById('list'), html = '';
-  for (var i=0;i<items.length;i++){
-    var it = items[i], isReady = it.status === 'ready';
-    if (isReady) ready++;
-    var pic = it.useRose ? ROSE : (it.usePhoto ? SHOTS[it.usePhoto] : null);
-    var thumb = pic ? '<img src="'+pic+'" alt="">' : '<span>'+(it.monogram||'◆')+'</span>';
-    html += '<div class="card'+(isReady?' ready':'')+'" data-i="'+i+'">' +
-            '<div class="thumb">'+thumb+'</div>' +
-            '<div style="min-width:0"><div class="tt">'+it.title+'</div>' +
-            '<div class="st">'+(it.statusLabel||'')+'</div></div>' +
+  var hid = readLS(HIDE);
+  var mine = readLS(STORE);
+  var items = mine.concat((DATA.items || []).filter(function(x){ return hid.indexOf(x.id) < 0; }));
+  VIEW = items;
+  var list = document.getElementById('list'), html = '';
+  for (var i = 0; i < items.length; i++){
+    var it = items[i];
+    var pic = it.thumb || (it.useRose ? ROSE : (it.usePhoto ? SHOTS[it.usePhoto] : null));
+    var thumb = pic ? '<img src="' + pic + '" alt="">' : '<span>' + (it.monogram || '◆') + '</span>';
+    html += '<div class="card' + (it.saved ? ' ready' : '') + '" data-i="' + i + '">' +
+            '<div class="thumb">' + thumb + '</div>' +
+            '<div style="min-width:0"><div class="tt">' + it.title + '</div>' +
+            '<div class="st">' + (it.statusLabel || '') + '</div></div>' +
             '<div class="go">›</div></div>';
   }
-  list.innerHTML = html || '<div class="empty"><img src="'+ROSE+'" alt=""><h2>Пока пусто</h2><p>Добавь первый предмет — и получишь готовый текст для публикации.</p></div>';
+  list.innerHTML = html || '<div class="empty"><img src="' + ROSE + '" alt=""><h2>Пока пусто</h2><p>Добавь первый предмет — и он останется здесь.</p></div>';
   document.getElementById('statTotal').textContent = items.length + ' ' + plural(items.length, ['предмет','предмета','предметов']);
-  document.getElementById('statReady').textContent = ready ? ready + ' ' + plural(ready,['текст ждёт','текста ждут','текстов ждут']) : 'всё опубликовано';
+  document.getElementById('statReady').textContent = mine.length ? mine.length + ' ' + plural(mine.length, ['свой','своих','своих']) : 'примеры';
+  document.getElementById('hint').style.display = items.length ? 'block' : 'none';
 
   var cards = list.querySelectorAll('.card');
-  for (var j=0;j<cards.length;j++) cards[j].onclick = function(){ tap(); openItem(DATA.items[+this.dataset.i], null); };
+  for (var j = 0; j < cards.length; j++){
+    (function(c){
+      c.onclick = function(){
+        if (c._lp) { c._lp = false; return; }
+        tap(); openItem(VIEW[+c.dataset.i], null);
+      };
+      longPress(c, function(){ removeCard(VIEW[+c.dataset.i]); });
+    })(cards[j]);
+  }
 }
 
 function plural(n, f){ var m = n % 100; if (m > 4 && m < 20) return f[2]; m = n % 10;
@@ -467,7 +530,18 @@ function build(){
     if (!animDone || !ready) return;
     clearInterval(iv);
     v.classList.remove('on');
-    openItem(result ? normalize(result) : pick(), shotData);
+    var item = result ? normalize(result) : pick();
+    if (shotData) {
+      shrink(shotData, 190, function(small){
+        persist(item, small);
+        openItem(item, shotData);
+        render();
+      });
+    } else {
+      persist(item, null);
+      openItem(item, shotData);
+      render();
+    }
     if (live && !result) toast(failed ? String(failed.message).slice(0, 48) : 'Показан пример');
     try { TG && TG.HapticFeedback.notificationOccurred('success'); } catch(e){}
   }
@@ -521,6 +595,7 @@ function openItem(it, photo){
 
   document.getElementById('foldBox').classList.remove('on');
   document.getElementById('foldIco').textContent = '+';
+  document.getElementById('btnDel').style.display = it.id ? 'flex' : 'none';
   show('result');
 }
 
@@ -528,6 +603,13 @@ document.getElementById('foldBtn').onclick = function(){
   tap();
   var b = document.getElementById('foldBox'), on = b.classList.toggle('on');
   document.getElementById('foldIco').textContent = on ? '–' : '+';
+};
+
+document.getElementById('btnDel').onclick = function(){
+  if (!current) return;
+  tap();
+  removeCard(current);
+  setTimeout(function(){ if (!document.querySelector('.card[data-i]') || true) show('home'); }, 350);
 };
 
 document.getElementById('btnCopy').onclick = function(){
